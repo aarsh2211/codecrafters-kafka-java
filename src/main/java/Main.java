@@ -1,4 +1,5 @@
 import java.io.BufferedOutputStream;
+import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -6,6 +7,7 @@ import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 public class Main {
   public static void main(String[] args){
@@ -22,11 +24,17 @@ public class Main {
        serverSocket.setReuseAddress(true);
        // Wait for connection from client.
        clientSocket = serverSocket.accept();
+
+         DataInputStream in = new DataInputStream(clientSocket.getInputStream());
+         byte[] inputBytes = new byte[1024];
+         in.skipBytes(8);
+          in.readFully(inputBytes, 0, 4);
+
          DataOutputStream outputStream =
                  new DataOutputStream(clientSocket.getOutputStream());
-         //byte [] bytes = ByteBuffer.allocate(4).putInt(7).array();
+
          outputStream.writeInt(4);
-         outputStream.writeInt(7);
+         outputStream.writeInt(byteArrayToInt(inputBytes, ByteOrder.BIG_ENDIAN));
 
      } catch (IOException e) {
        System.out.println("IOException: " + e.getMessage());
@@ -40,4 +48,10 @@ public class Main {
        }
      }
   }
+
+    public static int byteArrayToInt(byte[] bytes, ByteOrder order) {
+        ByteBuffer buffer = ByteBuffer.wrap(bytes);
+        buffer.order(order);
+        return buffer.getInt();
+    }
 }
