@@ -15,6 +15,11 @@ public class Main {
     private static final byte[] correlationId = new byte[4];
     private static final byte[] requestApiKey = new byte[2];
     private static final byte[] requestApiVersion = new byte[2];
+    private static final short MIN_SUPPORTED_VERSION = 1;
+    private static final short MAX_SUPPORTED_VERSION = 4;
+    private static final int THROTTLE_TIME = 0;
+    private static short errorCode;
+    private static final byte TAG_BUFFER = 0;
 
   public static void main(String[] args){
     // You can use print statements as follows for debugging, they'll be visible when running tests.
@@ -36,13 +41,25 @@ public class Main {
          in.readFully(inputBytes, 0, 12);
 
          updateHeaders(messageSize, correlationId, requestApiVersion, requestApiKey, inputBytes);
-
+         Short apiVersion = byteArrayToInt(requestApiVersion, ByteOrder.BIG_ENDIAN, Short.class);
+         extracted(apiVersion);
+         System.out.println("Error code for api version is " + errorCode + " " + apiVersion);
          DataOutputStream outputStream =
                  new DataOutputStream(clientSocket.getOutputStream());
 
-         outputStream.writeInt(byteArrayToInt(messageSize, ByteOrder.BIG_ENDIAN));
-         outputStream.writeInt(byteArrayToInt(correlationId, ByteOrder.BIG_ENDIAN));
-         outputStream.writeShort(35);
+
+         outputStream.writeInt(19);
+         outputStream.writeInt(byteArrayToInt(correlationId, ByteOrder.BIG_ENDIAN, Integer.class));
+         outputStream.writeShort(errorCode);
+         outputStream.writeByte(2);
+         outputStream.writeShort(byteArrayToInt(requestApiKey, ByteOrder.BIG_ENDIAN, Short.class));
+         outputStream.writeShort(MIN_SUPPORTED_VERSION);
+         outputStream.writeShort(MAX_SUPPORTED_VERSION);
+         outputStream.writeByte(TAG_BUFFER);
+         outputStream.writeInt(THROTTLE_TIME);
+         outputStream.writeByte(TAG_BUFFER);
+
+         outputStream.flush();
 
      } catch (IOException e) {
        System.out.println("IOException: " + e.getMessage());
@@ -57,18 +74,29 @@ public class Main {
      }
   }
 
+    private static void extracted(Short apiVersion) {
+        errorCode =  (apiVersion >4 || apiVersion<0) ? (short) 35 : 0;
+    }
+
     private static void updateHeaders(byte[] messageSize, byte[] correlationId, byte[] requestApiVersion, byte[] requestApiKey, byte[] inputBytes) {
       ByteBuffer byteBuffer = ByteBuffer.wrap(inputBytes);
       byteBuffer.get(0, messageSize, 0,  4);
       byteBuffer.get(4, requestApiKey, 0,  2);
       byteBuffer.get(6, requestApiVersion, 0,  2);
       byteBuffer.get(8, correlationId, 0,  4);
-
   }
 
-    public static int byteArrayToInt(byte[] bytes, ByteOrder order) {
-        ByteBuffer buffer = ByteBuffer.wrap(bytes);
+    public static <T> T byteArrayToInt(byte[] bytes, ByteOrder order, Class<T> clazz) {
+
+      ByteBuffer buffer = ByteBuffer.wrap(bytes);
         buffer.order(order);
-        return buffer.getInt();
+
+        if (clazz == Integer.class) {
+            return clazz.cast(buffer.getInt());
+        } else if (clazz == Short.class) {
+            return clazz.cast(buffer.getShort());
+        } else {
+            throw new IllegalArgumentException("Unsupported type: " + clazz);
+        }
     }
 }
